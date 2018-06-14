@@ -1,0 +1,12 @@
+potential     潜在的、可能的
+Assignment    分配、转让、任务
+assignee	  受托人、代理人、被指定人
+candidate	  候选人     
+category      类型
+tenant 		  房客、占有者、占用者
+delegate      代表、授权给
+Authenticated 认证的
+claim		  声称、索取、断言
+cascade 	  级联
+attachment    附件
+render		  给予;使成为;递交;表达

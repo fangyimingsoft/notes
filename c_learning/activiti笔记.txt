@@ -1,0 +1,468 @@
+1.BPM(Business Process Manager业务流程管理)
+
+2.BMPN(Business Process Modeling Notation业务流程建模标注)
+
+一、Activiti的七大Service接口
+   RepositoryService：流程仓库service，用于管理流程仓库，例如，部署、删除、读取流程资源
+   IdentifyService：身份service，可以管理和查询用户、组之间的管理
+   RuntimeService：运行时service，可以处理所有正在运行状态的流程实例、任务等
+   TaskService：任务service，用于管理、查询任务，例如，签收、办理、指派等
+   FormService：表单service，用于读取和流程、任务相关的表单数据
+   HistoryService：历史service，可以查询所有历史数据，例如，流程实例、任务、活动、变量、附件等
+   ManagementService：引擎管理service，和具体业务无关，主要查询引擎配置、数据库、作业等
+
+二、基于Eclipse插件流程设计器
+   1.流程的几个属性
+      1）Id : 流程的唯一标识
+      2）Name : 流程的名称,可以是任意字符
+      3）Namespace : 命名空间,一般使用公司名或组织域名 + 项目名称,可以细化到每个系统的模块,这样读者在实际项目中可以根据这个属性归类流程
+      4) Document : 针对当前流程功能的简短文字描述
+
+
+三、Activiti与BPMN2.0规范
+   根据BPMN2.0规范分类划分为以下几部分:
+      1.启动与结束事件(Event)
+      2.顺序流(Sequence Flow)
+      3.任务(Task)
+      4.网关(Gateway)
+      5.子流程(Subprocess)
+      6.边界事件(Boundary Event)
+      7.中间事件(Intermediate Event)
+      8.监听器(Listener)
+
+   1.启动与结束事件(Event)
+      每个流程总是以启动事件作为入口(可以是不同类型的启动事件),启动事件都是"捕获型"的,等待第三方触发后才可以启动.启动事件又可以分为以下三种类型:
+         1) 空启动事件
+            <startEvent id="startEvent" name="Start"></startEvent>
+            如上,startEvent表示一个启动事件,由于startEvent标签中没有任何其他的元素定义,所以称之为空启动事件,这也是其他启动事件的XML基本表示。Activiti根据实际需求在空启动事件的基础上进行了扩展。如activiti:formKey activiti:initiator等。
+
+         2) 定时启动事件
+            可以用于一次性定时启动、特定时间间隔后启动。XML描述在基本的启动事件中嵌套了一个定时事件定义timeEventDefinition:
+               <startEvent id="startevent1" name="Start" activiti:initiator="startUserId">
+                  <timerEventDefinition id="timeDefinition1">
+                     <timeCycle>R1/2018-05-01T00:00/PM1M</timeCycle>
+                  </timerEventDefinition>
+               </startEvent>
+            上述XML定义了一个定时事件,表示从2018年5月1日的每一个月启动一次流程。可以通过多种方式设置定时事件：
+               timeDate : 一次性定时启动,具体到一个日期,用ISO 8601表示,如<timeDate>2012-12-12T00:00:00</timeDate>在这个日期启动一次流程
+               timeDuration : 设置多长时间之后启动流程,如<timeDuration>PT10M</timeDuration>部署流程或者输出流的上一个任务完成10分钟后启动流程
+               timeCycle : 周期性启动任务,用来设置循环时间间隔,同样还是使用ISO 8601表示
+
+         3) 异常启动事件
+            异常启动事件可以出发一个异常子流程,但是不能通过API方式启动,它总是在另外一个流程跑出异常结束事件的时候被触发。
+            异常启动事件是“捕获型”，而异常结束事件是“抛出型”。
+            异常启动事件相对空启动事件来说要复杂一些，必须嵌套在一个事件子流程(EventSubProcess)中:
+            <subProcess id="eventsubprocess1" name="Event sub Process" triggeredByEvent="true">
+               <endEvent id="endevent3" name="End"></endEvent>
+               <scriptTask id="scripttask1" name="Script Task" scriptFormat="javascript" activiti:autoStoreVariables="false">
+                  <script>&lt;![CDATA[out:println "catch an error";]]&gt;</script>
+               </scriptTask>
+               <startEvent id="errorstartevent1" name="Error start">
+                  <errorEventDefinition errorRef="AIA001"></errorEventDefinition>
+               </startEvent>
+               <sequenceFlow id="flow2" sourceRef="scripttask1" targetRef="endevent3"></sequenceFlow>
+               <sequenceFlow id="flow3" sourceRef="errorstartevent1" targetRef="scripttask1"></sequenceFlow>
+            </subProcess>
+            上述配置表示,当捕获到异常代码为"AIA001"时触发异常启动事件，然后根据scriptTask输出"catch an error"文字
+
+         4) 消息启动事件
+            消息启动事件可以通过一个消息名称触发,从而启动一个流程实例;还可以结合消息抛出事件一起使用，由流程自动根据消息的名称启动对应的流程。XML配置如下:
+            <message id="reSendFile" name="重新发送文件"/>
+            ...
+            <startEvent id="messageStart">
+               <messageEventDefinition messageRef="reSendFile"/>
+            </startEvent>
+            可以通过Activiti提供的API触发消息启动事件,例runtimeService.startProcessInstanceByMessage("重新发送文件"),可以启动一个包含消息名称为"重新发送文件"的流程,当然还能使用runtimeService.startProcessInstanceByKey和runtimeService.startProcessInstanceById那样启动一个以消息启动事件为入口的流程。
+
+      结束事件和启动事件通常成对出现在流程定义中，当然流程定义时也允许没有结束事件(开始事件必不可少)。结束事件可以细分为一下几种类型:
+         ● 空结束事件
+         ● 异常结束事件
+         ● 终止结束事件
+         ● 取消结束事件
+      结束事件表示流程的结束,和启动事件的触发型不同的是,结束事件总是"抛出型"的,也就是当流程执行到结束时结束事件会跑出一个执行结果。
+         1）空结束事件
+            空结束事件不处理抛出结果，也可以理解为抛出的是一个“空”,所以没有什么需要流程引擎处理的。对于空结束事件，正常结束后流程引擎就不会在执行其他的操作了，因为一切都已经结束了，而且没有后续处理。XML如下：
+            <endEvent id="end" name="my end event"/>
+
+         2) 异常结束事件
+            异常结束事件有抛出结果,它定义了需要抛出的错误代码,如果找到了异常开始事件定义的异常代码,则会触发异常开始事件,否则按照空结束事件规则处理。(异常结束事件的错误代码不能为空):
+            <endEvent id="endevent1" name="ErrorEnd">
+               <errorEventDefinition errorRef="AIA-001"></errorEventDefinition>
+            </endEvent>
+            定义了一个errorEventDefinition表示一个异常事件,遇到异常结束事件时,引擎查询定义为errorRef属性值的异常启动事件并触发。
+
+         3) 终止结束事件
+            终止结束事件可以终止一个流程实例的执行,例如在付费流程中因为某些原因导致流程不能继续运行,最终的结果是取消本次付费,所以需要提结束流程实例的执行,此时可以把某个输出流指向终止结束事件。定义如下：
+            <endEvent id="terminateendevent1" name="TerminateEndEvent">
+               <terminateEventDefinition></terminateEventDefinition>
+            </endEvent>
+
+         4) 取消结束事件
+            可以取消一个[事务子流程]的执行,同时也只能在子流程中使用。当子流程执行过程中出现异常需要取消时，可以设置一个取消结束事件，当输出流指向到取消结束事件时流程将会终端执行。取消结束事件还可以和取消边界事件配合适应针对取消操作做后续处理。XML定义:
+            <endEvent id="myCancelEndEvent">
+               <cancelEventDefinition />
+            </endEvent>            
+
+   2.顺序流(Sequence Flow)
+      顺序流时两个模型之间的连接者。在BPMN2.0规范中每个输出流连接到不同的活动、事件。如果一个元素在流程执行期间被访问，流程会沿着该元素所有输出顺序流继续执行。意味着BPMN2.0默认行为是并行的：多个输出顺序流会创建多条独立、并行的执行路径。顺序流有两种：
+         1）标准顺序流
+            用来连接两个或多个模型建立关系，XML描述如下：
+            <sequenceFlow id="flow" sourceRef="startEvent" targetRef="userTask"></sequenceFlow>
+            Activiti对顺序流进行了扩展,允许开发人员在顺序流上添加监听器。
+
+         2）条件顺序流
+            条件顺序流是在标准顺序流上添加条件表达式，只有满足条件才能通过顺序流到达目标活动。XML定义：
+            <sequenceFlow id="flow" sourceRef="startEvent" targetRef="userTask">
+               <conditionExpression xsi:type="tFormalExpression">
+                  <![CDATA[${pass==true}]]>
+               </conditionExpression>
+            </sequenceFlow>
+            在conditionExpression设置UEL表达式用于计算逻辑值。
+
+   3.任务(Task)
+      任务是一个流程中最重要的组成部分，根据业务需求的不同分为多种类型：
+         ● 用户任务
+         ● 脚本任务
+         ● WebService任务
+         ● 业务规则任务
+         ● 邮件任务
+         ● Mule任务
+         ● Camel任务
+         ● 手动任务
+         ● Java service任务
+         ● Shell任务
+      所有任务图形化表示都是以一个矩形为基础,在左上角添加具体类型的图标。大多数都有单独的XML定义，用来描述一种特定任务类型，也有部分是基于serviceTask扩展的。
+
+         1) 用户任务
+            用户任务需要人来参与，因为它必须被人为触发(完成任务动作)。用户任务可以定义任务的名称、优先级、到期日和任务处理人(可以是人、组织或者两者结合)。用户任务使用userTask表示,以下定义了一个基本的用户任务,把任务分配ID为henryyan的用户办理:
+            <userTask id="leaderAudit" name="领导审批">
+               <humanPerformer>
+                  <resourceAssignmentExpression>
+                     <formalExpression>henryyan</formalExpression>
+                  </resourceAssignmentExpression>
+               </humanPerformer>
+            </userTask>
+            humanPerformer标签定义表示把这个任务分配给一个人,并且在formlExpression用一个表达式指定了用户任务分配给henryhan办理。
+            除了可以分配给一个用户之外还可以分配给组或两者混合，如下展示了把一个任务分配给多个获选人：
+            <userTask id="leaderAudit" name="领导审批1">
+               <potentialOwner>
+                  <resourceAssignmentExpression>
+                     <formalExpression>
+                        user(henryyan),group(leader),manager
+                     </formalExpression>
+                  </resourceAssignmentExpression>
+               </potentialOwner>
+            </userTask>
+            使用potentialOwner标签来描述一个潜在的用户、组集合，在formalExpression中把这个任务同时分配给用户henryyan、组leader和组manager(如果不添加user或group关键字说明括号中的候选人默认为group类型,这是BPMN2.0规范规定的)。
+            吃完Activiti在BPMN2.0的基础上进行扩展,可以简化设置组用户、组的方式，而且支持动态(运行时)获取用户、组分配给用户任务；还能为用户任务设置创建、分配、完成监听。如下
+            属性名称                    属性说明                        示例
+            activiti:assignee          指定用户任务的处理人，代替了      <userTask id="" name="审批"
+                                       humanPerformer的功能            activiti:assignee=henryyan"/>
+
+            activiti:candidateUsers    用来指定用户任务的候选人,多个     ..activiti:candidateUsers="henryyan"..
+                                       用逗号分开,代替了potentialOwner
+
+            activiti:cadidateGroups    用来指定候选组,多个用逗号分开,    ..activiti:candidateGroups="leader,
+                                       代替了potentialOwner的功能       manager"..
+
+            activiti:dueDate           设置用户任务到期日,通常用变量      ..activiti:dueDate="${overDate}"..
+                                       代替
+
+            activiti:priority          用户任务的优先级,取值区间[0,100]   ..activiti:priority=${priority}..
+            除了上述属性之外,Activiti还允许用户在任务上添加监听任务,监听的选项有:create、assignement(分配)、complete
+
+         2) 脚本任务
+            脚本任务可以运行引擎依赖的语言之外的脚本语言,例如Activiti支持的Groovy,JavaScript,Juel。脚本任务的代码需要符合JSR-223的规范.XML定义如下:
+               <scriptTask id="scripttask1" name="初始化变量" scriptFormat="groovy" activiti:autoStoreVariables="false">
+                  <script><![CDATA[def name = "HenryYan";
+                     execution.setVariable('name',name);
+                     ]]>
+                  </script>
+               </scriptTask>
+
+               <scriptTask id="scripttask2" name="输出变量" scriptFormat="groovy" activiti:autoStoreVariables="false">
+                  <script>&lt;![CDATA[out:println name;]]&gt;</script>
+               </scriptTask>
+               脚本任务的属性:
+               属性名称                       属性说明                    示例
+               scriptFormat                  指定符合JSR-223规范的        <scriptTask id="scripttask1"
+                                             脚本语言的类型                 name="初始化变量"
+                                                                           scriptFormat="groovy"/>
+
+               activiti:resultvariable       Activiti在BPMN2.0规范中     ..activiti:resultVariable="name"..
+                                             的脚本任务基础上的扩展,可以   指定的变量名称乣在脚本中预先定义才能
+                                             把脚本处理的结果保存到变量中  使用
+
+
+         3) JavaService任务
+         4) 业务规则任务
+         5) 邮件任务
+         6) Mule任务
+         7) Camel任务
+         8) 手动任务
+         9) Java service任务
+         10) Shell任务
+
+
+
+
+
+   4.网关(Gateway)
+   5.子流程(Subprocess)
+   6.边界事件(Boundary Event)
+   7.中间事件(Intermediate Event)
+   8.监听器(Listener)
+
+四、用户与组&&部署管理
+   1.用户
+
+   2.组
+      Activiti中,组的类型分为两种,即assignment和security-role,前者为一种普通的岗位角色,是分配业务中的功能权限,后者是虐泉角色,可以从全局管理用户组织及整个流程的状态。
+
+   3.用户任务中的用户与组
+      任务可以有多个候选人和候选组，当一个候选人签收这个任务后，其他候选人就失效了。
+
+   4.部署流程资源
+      【流程资源】可以是各种类型的文件，再启动流程或流程实例运行过程中会被读取。常用的流程资源：
+      ● 流程的定义文件 : 扩展名为bpmn20.xml 和 bpmn
+      ● 流程定义的图片 : 一般用PNG格式
+      ● 表单文件 : 把表单内容保存在一个文件中,扩展名为form
+      ● 规则文件 : 例如Drools的规则文件,其扩展名为dtl
+      部署流程资源的方式有多种,包括:classpath,InputStream,字符串,zip格式压缩包。、
+      1）classpath方式
+         classpath方式的路径名称规范用斜杆"/"方式分隔多个包名。例：
+            DeploymentBuilder builder = repositoryService.createDeployment();
+            builder.addClassPathResource("bpmn/fangyiming.bpmn").deploy();
+
+      2) InputStream方式
+         这种方式需要传入一个输入流及资源的名称,输入流的来源不限,可以从classpath、网络、本地文件等读取。
+            DeploymentBuilder builder = repositoryService.createDeployment();
+            InputStream is = new FileInputStream("c://fangyiming.bpmn");
+            builder.addInputStream("anyname.bpmn",is).deploy(); 
+
+      3) 字符串方式
+         利用字符串方式可以直接传入纯文本作为资源的来源。classpath方式和InputStream方式都是读取一个输入流后部署资源,和这两种方式类似,字符串方式的实现原理是把一组字符串的内容转换为字节流后再部署。
+            String text = "<?xml varsion=\"1.0\"?>.....";
+            DeploymentBuilder builder = repositoryService.createDeployment();
+            builder.addString("fangyiming.bpmn",text).deploy();
+            
+      4) zip/bar格式压缩包方式
+         上面三种部署方式一次只能部署一个资源,除非多次执行deployment.addXxx()方法。activiti允许把一批资源打包部署,打包文件扩展名可以是Activiti官方推荐的bar或普通的zip
+            DeploymentBuilder builder = repositoryService.createDeployment();
+            InputStream zipStream = getClass().getClassLoader().getResourceAsStream("bpmn/deployment.zip")
+            builder.addZipInputStream(new ZipInputStream(zipStream)).deploy();
+
+   5.流程部署及资源读取
+      介绍如何利用API读取已部署的资源,例如读取流程定义的XMl文件内容或对应的图片文件等。
+      1）读取已部署流程定义
+         repositoryService.createProcessDefinitionQuery().list();
+
+      2) 读取流程定义的XML
+         **所有流程资源(不管是xml,png格式还是其他格式的资源)均通过一个方法repositoryService.getResourceAsStream()读取。
+         String deploymentId = "003_";
+         String resourceName = "fangyiming.bpmn";
+         InputStream is = repositoryService.getResourceAsStream(deploymentId,resourceName);
+
+   **3) 读取流程定义的图片及图片中的中文乱码
+         一个流程定义会对应一个图片资源。图片可以由引擎自动生成，或者与流程定义一起部署(压缩包方式),这样引擎不在自动生成图片资源,而是使用部署中的图片资源。
+         （引擎生成图片资源：在部署包下包含和流程定义同名的图片文件）
+         乱码原因：Activiti引擎默认字体为"Arial",而"Arial"不支持中文字符(Windows平台上会产生这种问题)。
+         解决方式：
+            1.Activiti生成图片使用的是Awt,负责生成图片的Java类为"org.activiti.engine.impl.bpmn.diagram.ProcessDeiagramCanvas",此类有一行关键代码"Font font = new Font("Arial",Font.BOLD,11);".中文版本的Windows默认自带"宋体",将改类中字体名称改掉即可.            
+         **2.Activiti 5.12版本后可通过配置方式修改字体名称,例 :
+            <bean id="processEngineConfiguration" class="org.activiti.spring.SpringProcessEngineConfiguration">
+            ...
+               <property name="activityFontName" value="宋体"></property>
+               <property name="labelFontName" value="宋体"></property>
+            </bean>  
+            3.将流程定义文件和同名的流程图片文件一起打包后部署
+
+      4) 删除部署
+         一个流程定义不能直接删除,而需要通过流程定义的部署ID删除。在执行删除操作时会同时删除所有和本次部署有关的资源。
+         String deploymentId = "";
+         boolean cascade = true;
+         repositoryService.deleteDeployment(deploymentId,cascade);
+         cascade表示级联删除,会将该部署下的所有资源、流程定义、流程实例、任务等等资源全部删除。
+
+
+
+五、任务表单
+   1.动态表单
+      1) activiti:initiator属性
+         在startEvent标签中定义,可以把启动流程实例的操作人以变量名称保存到数据库中,需要配合idendityService.setAuthenticatedUserId(String userid)使用,userId为当前操作人,在实际的应用中应该是当前的用户ID,引擎会把userid作为流程启动人。要获取设置的用户ID，可以通过Authentication.getAuthenticatedUserId()来实现。
+
+      2）XML定义:
+      <startEvent id="startevent1" name="Start" activiti:initiator="startUserId">
+         <extensionElements>
+           <activiti:formProperty id="startDate" name="请假开始日期" type="date" datePattern="yyyy-MM-dd" required="true"></activiti:formProperty>
+           <activiti:formProperty id="endDate" name="请假结束日期" type="date" datePattern="yyyy-MM-dd" required="true"></activiti:formProperty>
+           <activiti:formProperty id="reason" name="请假原因" type="string" required="true"></activiti:formProperty>
+         </extensionElements>
+      </startEvent>
+      空启动事件一共定义了三个字段,用来描述请假信息。每一个字段配置了几个属性，每个属性的含义如下：
+      属性名名称             属性说明
+      id                    字段的唯一标识,在保存字段时就是用此字段作为key
+
+      name                  用来描述字段的名称
+
+      type                  字段的类型,Activiti默认支持几种类型:
+                              ● string,对应类为org.activiti.engine.impl.form.StringFormType
+                              ● long,对应类为.....LongFormType
+                              ● enum,对应类为.....EnumFormType
+                              ● date,对应类.......DateFormType
+                              ● boolean,对应类....BooleanFormType
+
+      values               字段值
+
+      expression           表达式,可以通过计算表达式设置字段的值,例expression="#{leave.reason}"
+                           可以从变量名为leave的变量中获取属性reason的值
+
+      variable             将字段的值以variable指定的变量名保存
+
+      default              字段默认值
+
+      datePattern          属性type的值为"date"时需要设置此属性定义日期格式,如yyyy-MM-dd
+
+      readable             字段是否可读
+
+      writable             字段是否可写
+
+      required             是否必填项
+
+      form values          这个不是属性,而是当type="enum"时需要指定多个可选值,在activiti:formProperty
+                           标签中嵌入多个activiti:value标签,例如:
+                           <activiti:formProperty id="result" name="处理结果" type="enum" required="true">
+                              <activiti:value id="yes" name="同意"></activiti:value>
+                              <activiti:value id="no" name="不同意"></activiti:value>
+                           </activiti:formProperty>
+
+      3) formService.submitStartFormData();
+         该方法同样可以启动一个流程实例,不过这个方法在执行启动流程实例时会从第二个参数(variables)中读取和表单字段ID相同的项作为表单的值,如果某个字段设置了"required"属性并在变量中未找到字段相同的ID或值为空,则会抛出异常。
+         与runtimeService.startProcessInstance有一个很重要的区别,通过submitStartFormData启动时字段的值只能为"字符型",因为表单的内容都是字符型。
+
+      4）任务签收与办理
+         代办任务的数据来源有四类：
+            1.直接分配，通过humanPersormer元素或者activiti:assignee属性指定某个人的Id作为任务办理人
+            2.在候选人范围之内
+            3.属于某个候选组
+            4.代办的任务(属于用户A的任务,A把任务交给用户B办理),"转办"的任务,把一个任务的办理人重新分配称为转办。
+
+   2.外置表单
+      在启动事件和用户任务上设置表单属性activiti:formKey设置表单名称。activiti:formKey支持动态设置(用变量的方式设置),例如activiti:formKey="${fooFormName}.form",在任务启动或完成时通过变量设置fooFormName即可动态设置表单内容,这对根据业务状态读取不同的表单非常有用。
+      部署外部表单流程时需要把流程定义文件和表单文件打包部署，因为当读取表单时(启动事件和用户任务)会以当前流程的部署ID和activiti：formKey属性为过滤条件。部署时流程定义文件中指定的form文件名称需要在部署包(压缩文件)中保持相同的层级。
+
+      1）自定义表单引擎
+         动态表单读取的表单返回的是一个Form对象,而外置表单默认用纯文本格式返回表单文件的内容。Activiti支持自定义表单引擎以适应各种场景,默认的表单引擎为org.activiti.engine.impl.form.JuelFormEngine,是基于Juel实现的,该引擎可以计算表单文件中EL表达式作为表单内容,所以当调用FormService接口的getRendered*Form方法得到的内容是经过Form引擎处理过的。
+         创建自定义表单引擎只需要实现接口org.actitivi.engine.impl.form.FormEngine,然后在引擎中注册实现类: 
+         <bean id="processEngineConfiguration" class="org.activiti.spring.SpringProcessEngineConfiguration">
+            ...
+            <property name="customFormEngines">
+               <list>
+                  <bean class="com.fym.activiti_learning.form.engine.MyFormEngine"/>
+               </list>
+            </property>
+         </bean>
+
+六、Activiti与容器集成
+   与Spring集成的目的是把获取引擎与Service的方式由Spring代理统一管理,以及业务流程引擎的同意事务管理(这也是与Spring集成的一个重要原因)。
+   首先配置一个类名为SpringProcessEngineConfiguration的bean来设置创建引擎所需的参数,再使用FactoryBean生成ProcessEngine:
+      <bean id="processEngineConfiguration" class="org.activiti.spring.SpringProcessEngineConfiguration">
+      ...
+      </bean>
+      <bean id="processEngine" class="org.activiti.spring.ProcessEngineFactoryBean">
+         <property name="processEngineConfiguration" ref="processEngineConfiguration/>
+      </bean>
+   基于Spring创建引擎的方式有一点需要特别声明,那就是事务管理器。编码创建引擎的方式，引擎采用Mybatis内置的事务管理器,如果使用Spring方式创建引擎,就必须明确指定一个事务管理器。
+      <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+         <property name="driverClassName" value="com.mysql.jdbc.Driver"></property>
+         <property name="url" value="jdbc:mysql://localhost:3306/activiti"></property>
+         <property name="username" value="root"></property>
+         <property name="password" value="fangyiming"></property>
+      </bean>      
+      <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+         <property name="dataSource" ref="dataSource"></property>
+      </bean>
+      <tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true"/>
+      <bean id="processEngineConfiguration" class="org.activiti.spring.SpringProcessEngineConfiguration">
+         <property name="dataSource" ref="dataSource"></property>
+         <property name="transactionManager" ref="transactionManager"></property>
+         ...
+      </bean>           
+      <bean id="processEngineFactory" class="org.activiti.spring.ProcessEngineFactoryBean">
+         <property name="processEngineConfiguration" ref="processEngineConfiguration"></property>
+      </bean>
+      <bean id="repositoryService" factory-bean="processEngineFactory" factory-method="getRepositoryService"/>
+      <bean id="runtimeService" factory-bean="processEngineFactory" factory-method="getRuntimeService"/>
+      <bean id="identityService" factory-bean="processEngineFactory" factory-method="getIdentityService"/>
+      <bean id="formService" factory-bean="processEngineFactory" factory-method="getFormService"/>
+      <bean id="managementService" factory-bean="processEngineFactory" factory-method="getManagementService"/>
+      <bean id="historyService" factory-bean="processEngineFactory" factory-method="getHistoryService"/>
+      <bean id="taskService" factory-bean="processEngineFactory" factory-method="getTaskService"/>
+      1.声明一个数据源,并声明一个事务管理器,用tx:annotation-driver声明注解配置事务。
+      2.在配置对象中注入数据源与事务管理器
+      3.定义一个引擎工厂，并注入了引擎配置bean对象processEngineConfiguration,这样就可以通过工厂对象创建引擎对象。
+      4.分别用Spring提供的工厂方式获取Activiti的7个Service接口对象。
+
+   1.自动部署流程定义
+      自动部署是通过Spring方式创建流程引擎的一个独有的功能,可以在初始化引擎时自动把定义的资源部署到引擎中。可以使用多种方式配置资源路径，例如classpath、file等。
+   **（DeploymentBuilder的enablDuplicateFiltering()方法作用是排除重复的流程定义,所以只有流程数据库中没有和自动部署   的流程定义相同的记录才会部署,否则会忽略,不会出现启动多次引用后部署多个版本的问题）
+      <bean id="processEngineConfiguration" class="org.activiti.spring.SpringProcessEngineConfiguration">
+         ...
+         <property name="deploymentResource" value="classpath*:/dir1/**/*.bpmn"></property>
+      </bean>
+      上述配置会读取classpath中的dir1目录下的所有以bpmn为扩展名的文件。
+
+
+   2.表达式
+      1）基础
+         在流程定义中几乎所有的属性都可以使用变量方式定义。流程定义文件中出现的判断条件的语句或者调用一个Bean的方法都称为表达式。对表达式的解析右JUEL根据UEL规范实现,之后Activiti又对JUEL进行扩展以满足更多需要。
+
+                                 UEL表达式的应用示例:
+
+         表达式                                  含义
+         ${myVar}                                获取变量名称为myVar的变量值
+
+         ${myVar.name}                           从变量myVar中读取name属性
+
+         ${serviceBean.confirm()}                执行变量名称为serviceBean的confirm()方法
+
+         ${serviceBean.confirm('henryyan')}      调用方法,传入一个字符串'henryyan'作为参数。这里
+                                                 的字符串也可以使用变量代替，如果在变量中包含一个
+                                                 名称为name的变量,就可以动态设置方法的参数,例如
+                                                 ${serviceBean.confirm(name)}
+
+         ${serviceBean.confirm(name,execution)}  第二个参数为引擎内置变量execution
+
+
+                        引擎内置的三个变量
+
+         变量名称                            含义
+         execution                          该变量在运行阶段总是可以调用,对应接口:org.activiti.engine.dele
+                                            gate.DelegateExecution,可以获取流程实例的变量,包含了一些执行期的
+                                            信息项,例如流程实例ID、业务ID、当前节点等信息、7个接口等。
+                                            如果在流程定义中添加了执行监听器或为某个活动添加了Delegate(实现了
+                                            JavaDelegate接口),那么接口将提供一个DelegateExecution对象作为参数。
+
+         task                               相对于execution来说,task变量的作用于就比较小了,execution可以在整个
+                                            运行期的所有活动上使用,但是task(DelegateTask接口)仅仅支持用户任务(
+                                            UserTask),而且限定为expression类型的表达式。所以通过此变量可以设置
+                                            或者读取任务相关的变量，设置任务办理人或者候选人等，基本涵盖任务相关
+                                            的所有属性以及特性。
+                                            例如,下面的配置可以在一个用户任务创建时执行一个表达式,并在执行时把
+                                            DelegateTask的对象传给被调用对象的方法:
+                                            <userTask id="xxx">
+                                                <extensionElements>
+                                                   <activiti:taskListener event="create" expression="
+                                                   ${myBean.invokeTask(task)}">
+
+                                                   </activiti:taskListener>
+                                                </extensionElements>
+                                            </userTask>
+
+         authenticatedUserId                此变量仅在启动流程实例前调用IdentityService的setAuthenticatedUserId
+                                            的方法时才会由引擎提供,获取的方式很简单,${authenticatedUserId}即可
+
+      在Activiti中,所有表达式中出现的变量均需要实现序列化接口。对于上述三个内置变量，仅能通过表达式获取。
+
+      2.表达式示例
+      
