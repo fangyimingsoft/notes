@@ -63,6 +63,18 @@
 
 8.远程仓库
    关联一个远程仓库
+      git remote add origin git@github.com:fangyimingsoft/learngit.git
+   关联后,使用命令
+      git push -u origin master第一次推送master分支的所有内容
+   此后,每次本地提交后,使用
+      git push origin master推送新更改
+
+   从远程仓库克隆
+      git clone git@github.com/fangyiming/notes.git
+   git会在当前位置新建一个名为notes的工作区。
+
+
+
 
 
 
