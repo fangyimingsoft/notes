@@ -73,6 +73,126 @@
       git clone git@github.com/fangyiming/notes.git
    git会在当前位置新建一个名为notes的工作区。
 
+9.分支管理
+   1.创建与合并分支
+      创建分支
+         git branch branch_name
+      切换到新分支
+         git checkout branch_name
+      上面两条语句也可以合并成一条
+         git checkout -b branch_name
+      使用
+         git branch 查看当前分支
+
+      切换分支
+         git checkout branch_name
+      合并某分支到当前分支
+         git merge branch_name
+      删除分支
+         git branch -d branch_name
+
+   2.解决冲突
+      Git无法自动合并时,必须手动解决冲突后,再提交,此时合并完成。
+
+   3.分支管理策略
+      通常,合并分支时,如果可以,Git会使用Fast Forward模式,这种模式下,删除分支信息后,会丢掉分支信息。
+      使用Fast Forward模式时,merge时就像这样:
+                                             HEAD        
+                                                ↘        
+               master                             master          
+                  ↓                                 ↓ 
+      ○-----○-----○-----○    ->   ○-----○-----○-----○ 
+                        ↑                           ↑
+                       dev                         dev 
+                      ↗
+                    HEAD
+
+      不使用Fast forward模式,merge时像这样:
+                                             HEAD        
+                                                ↘        
+               master                             master          
+                  ↓                                 ↓ 
+      ○-----○-----○-----○    ->   ○-----○-----○-----○ 
+                        ↑                      ＼ ／   
+                       dev                       ○ 
+                      ↗                         dev
+                    HEAD      
+
+      禁用Fast forward模式合并dev分支:
+         git merge --no-ff -m "merge with no-ff" dev
+      因为此次合并要创建一个新的commit,所以加上-m参数,把commit的备注写入。
+
+   4.bug分支
+      比如有个代号101的bug任务时,很自然的你想创建一个issue_101的分支来修复它,但是当前dev上进行的工作还没有提交,此时你的工作还没完成,还没发提交,预计还需要2天时间。但2小时内你得修复这个BUG。
+      Git提供了
+         git stash
+      这个命令可以把当前工作现场(工作区的修改以及暂存区数据)存储起来,等以后恢复现场后继续工作
+
+      查看已保存的工作现场
+         git stash list
+
+      恢复工作现场,有两种方式
+         1.使用
+             git stash apply
+           恢复,恢复后stash的内容没有删除,需要使用
+             git stash drop
+           进行删除
+
+         2.使用
+            git stash pop
+           该命令在恢复的同时会把stash的内容删除
+
+      你可以多次进行git stash操作,恢复时,先使用git stash list查看,然后恢复指定的stash
+         git stash apply stash@{0}
+
+
+
+   5.Feature分支
+      开发一个新feature(特征、功能)，最好新建一个分支;
+      如果要丢弃一个没有被合并过的分支,可以通过
+         git branch -D <name>
+      进行强行删除
+
+   6.多人协作
+      当从远程仓库克隆时,Git自动把本地的master分支和远程的master分支对应起来了,并且,远程仓库的默认名称为origin
+
+      查看远程仓库的信息,用
+         git remote
+      或者,使用
+         git remote -v 显示详细的信息
+
+      ● 推送分支
+         把该分支上的所有本地提交推送到远程库。推送时，要指定本地分支，这样Git就会把该分支推送到远程库对应的远程分支上：
+            git push origin master
+         如果要推送其他分支到远程仓库,比如dev :
+            git push origin dev
+
+      ● 抓取分支
+         多人协作时,大家都会往master和dev分支上推送各自的修改,现在有你有一个小伙伴,从远程库clone下整个库:
+            git clone git@github.com:fangyimingsoft/learngit.git
+
+         默认情况下,你的小伙伴只能看到本地的master分支,可以使用git branch看看。现在你的小伙伴需要在dev上开发，此时必须创建远程origin的dev分支到本地,于是他用这个命令创建本地dev分支:
+            git checkout -b dev origin/dev
+         现在,他就可以在dev上继续修改,然后时不时将dev分支push到远程:
+            git push origin dev
+
+         你的小伙伴已经向origin/dev分支推送了他的提交,碰巧你也对同样的文件作了修改,并试图推送。此时推送失败，Git提示使用
+            git pull
+            (
+               此时git pull可能失败(如果pull的是非master分支),原因是没有指定本地分支dev与远程origin/dev分支的链接:
+                  git branch --set-upstream-to=origin/dev dev
+
+            )
+         把最新的提交从origin/master抓下来,然后在本地合并,解决冲突,再推送:
+            git push origin master
+
+
+   7.rebase
+
+10.标签管理
+
+11.自定义Git
+
 
 
 
@@ -81,6 +201,7 @@
 命令补充:
    git log => 查看历史记录
    git reflog => 记录了你操作的每一次命令,可以用来查看commit id
+   git log --graph => 查看分支合并图
 
 
 总结:
