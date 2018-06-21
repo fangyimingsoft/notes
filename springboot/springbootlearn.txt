@@ -1,0 +1,104 @@
+SpringBoot
+一.通过Spring Initializr创建Spring Boot项目
+	Spring Initializr有几种使用方式:
+	1.通过Web界面使用
+		在start.spring.io页面中,勾选所需要的依赖,下载依赖包导入到项目中。
+
+	2.使用Spring Boot CLI
+		Spring Boot CLI有一些命令可以让你使用Initializr,通过它上手开发传统Java项目。
+		Spring Boot CLI包含了一个init命令,可以作为Initializr的客户端界面。init命令最简单的用法就是创建Spring Boot项目的基线:
+			spring init
+		这条命令会下载一个demo.zip文件,包含一个典型的项目结构,以及一个maven的pom.xml文件。这个文件只包含最基本的内容，即只有Spring Boot基线和测试起步依赖。
+
+		假如你想构建一个Web应用程序,其中使用JPA实现数据持久化,使用Spring Security进行安全加固,可以使用-dependencies或-d来指定那些初始化依赖:
+			spring init -dweb,jpa,security
+		这条命令会下载一个demo.zip文件,包含和之前一样的项目结构,但在pom.xml里增加了Spring Boot的Web jpa和securityqi起步依赖。（-d和依赖之间不能加空格,否则空格后面表示zip文件名称）
+
+		假如你想用Gradle来构建项目。使用--build参数将Gradle指定为构建类型(默认构建方式为maven):
+			spring init -dweb,jpa,security --build gradle
+
+		默认情况下,无论是Maven还是Gradle的构建说明都会产生一个可执行的Jar文件。但如果你想要一个War文件,可以通过--packaging或者-p参数进行说明:
+			spring init -dweb,jpa,security --build gradle -p war
+
+		目前为止,init命令只用来下载ZIP文件,如果你想让CLI帮你解压ZIP文件,可以指定一个用于解压的目录:
+			spring init -dweb,jpa,security --build gradle -p war myapp
+		最后一个参数说明你希望把项目解压到myapp目录中去
+
+		此外如果你希望把生成的项目解压到当前目录,可以使用--extract或者-x参数:
+			spring init -dweb,jpa,secuity --build maven -p jar -x	
+
+		init命令还有不少其他参数,可以通过help命令了解所有参数的情况:
+			spring help init
+
+		也可以查看参数有哪些可选项,为init命令带上--list 或 -l参数就可以了:
+			spring  init -l
+
+	3.通过IntelliJ IDEA使用
+
+	4.通过Spring Tool Suite
+		略
+
+二、Spring Boot入门
+	1.覆盖起步依赖引入的传递依赖
+		起步依赖和项目中的其他依赖没有什么区别,可以通过构建工具中的功能,选择性的覆盖他们引入的传递依赖的版本号,排除传递依赖,当然还可以为哪些Spring Boot起步依赖没有涵盖的库指定依赖。
+
+		以Spring Boot的Web起步依赖为例,它传递了Jackson Json库,但你在项目中可能用不上Jackson,于是你可以使用<exclusions>元素排除传递依赖:
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>com.fasterxml.jsckson.core</groupId>
+					<artifactId>jsckson-core</artifactId>
+				<exclusion>
+				<exclusion>
+					...
+				<exclusion>
+				...
+			</exclusions>
+		</dependency>
+
+		还有可能,项目需要jackson,但是需要使用另一个版本的jsckson进行构建,而不是Web起步依赖里的那个。假设Web起步依赖使用了2.3.4版本，但你需要使用2.4.3。在Maven中,你可以直接在pom.xml中表达诉求,像这样:
+		<dependency>
+			<groupId>org.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+			<version>2.4.3</version>
+		</dependency>		
+		Maven总是会用最近的依赖，也就是说，你在构建说明文件中增加的这个依赖，会覆盖传递依赖引入的那个依赖。
+
+	2.使用自动配置
+		Spring Boot的自动配置是一个运行时(程序启动时)的过程,考虑了众多因素,才决定Spring配置应该用哪个,不用哪个。
+
+三、自定义配置
+	1.覆盖Spring Boot的自动配置
+
+	2.通过属性文件外置配置
+		在不需要大量修改配置时,可以使用属性文件微调一些细节,比如修改端口号和日志级别。
+
+		比如,你想禁用Spring Boot启动时的Banner,可以设置
+			spring.main.banner-mode=off
+
+		你可以从多处设置这些属性,SpringBoot能从多种属性源获得属性,包括如下几处:
+		(1)命令行参数
+		(2)java:com/env例的JNDI属性
+		(3)JVM系统属性
+		(4)操作系统环境变量
+		(5)随机生成的带random.*前缀的属性(在设置其他属性时,可以引用他们,比如my.id=${random.log})
+		(6)应用程序意外的application.properties或者application.yml文件
+		(7)打包在应用程序内的application.properties或者application.yml文件
+		(8)通过@PropertySource标注的属性源
+		(9)默认属性
+		列表按照优先级排序,就是说,高优先级属性源中设置的属性会覆盖优先级低的相同属性。例如，命令行参数会覆盖其他属性源中的属性。
+
+		application.proerties和application.yml文件能放在以下四个位置:
+		(1)外置,在相对于应用程序运行目录的/config子目录里
+		(2)外置,在应用程序运行的目录里
+		(3)内置,在config包里
+		(4)内置,在Classpath根目录
+		同样,列表按优先级排序。就是说，在/config子目录里的application.properties会覆盖应用程序classpath里的application.properties中的相同属性。
+		此外，如果在同一优先级位置同时又application.properties和application.yml,那么.yml里的属性会覆盖.properties里的属性
+
+
+
+
+	
