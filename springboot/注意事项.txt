@@ -1,0 +1,4 @@
+1.关于static和templates目录
+	1) static目录下的资源可以通过浏览器直接访问
+	2) 默认情况下,"/"指向的是/resource/static/index.html文件
+	3) templates中存放的是模板引擎的模板文件,如果引入了模板引擎,可能"/"指向的地址变为"/resource/templates/"。thymeleaf默认指向的地址为"/resources/templates/index.html"

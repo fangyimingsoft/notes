@@ -1,0 +1,63 @@
+一、核心类和接口
+    1.Widget：定义了Element createElement();接口
+
+    2.RenderObjectWidget,继承自Widget:
+        1）定义了
+            i.RenderObject createRenderObject(BuildContext context);//创建RenderObject
+            ii.void updateRenderObject(BuildContext context, covariant RenderObject renderObject) { }//更新RenderObject
+            iii.void didUnmountRenderObject(covariant RenderObject renderObject) { }//卸载RenderObject
+
+        2）重新定义了Widget的createElement方法
+            RenderObjectElement createElement();
+
+    3.RenderObject：是最终布局、渲染UI界面的对象。
+
+
+二、布局类Widget
+    布局类Widget都会包含一个或多个子Widget,flutter中根据widget是否需要包含子节点将widget分成了三类,都继承自RenderObjectWidget
+    1.Flutter中Widget的分类
+        1）LeafRenderobjectWidget
+            Widget树的叶子节点,用于没有子节点的widget,通常基础widget都属于这一类,像Text,Image等(Flutter中多种Widget都是直接继承自StatelessWidget或StatefulWidget,然后在build中构建真正的RenderObjectWidget,如Text)。
+
+        2）SingleChildRenderObjectWidget
+            包含一个子Widget,像ConstrainedBox、DecoratedBox
+
+        3）MultiChildRenderObjectWidget
+            包含多个子Widget,如Row、Column等
+
+    2.线性布局Row(Column类似)
+        核心属性
+        1）textDirection：子widget的布局方向,默认为系统当前Locale环境的文本方向(中英文从左往右,阿拉伯从右往左)
+        2）verticalDirection：纵轴的对其方向,默认VerticalDirection.down,表示从上到下(该属性是和crossAxisAlignment属性有关联)。
+
+    3.弹性布局
+        1.Flex
+            可以沿着水平或垂直方向排列子Widget(Column和Row继承了Flex)
+
+        2.Expanded：等比例扩伸Row、Column和Flex子Widget所占用的空间(作为Row、Column和Flex的子Widget使用)
+            const Expanded({int fluex = 1,@required Widget child});
+        其中flex为弹性系数,如果是0或者null,则child没有弹性,如果大于0,所有的Expand按照其flex的比例来分割主轴全部的剩余空间
+
+    4.流式布局
+        超出屏幕显示范围自动折行的布局叫做流式布局
+        1）Wrap
+        核心属性
+            1.direction：设置主轴，值为Axis的枚举值
+            2.runAlignment：纵轴方向的对齐方式
+            3.runSpacing：纵轴方向的间距
+
+        2）Flow
+            较复杂,需要自己实现子widget的位置转换。但是性能好。
+
+    5.层叠布局(绝对定位)
+        1）Stack和Positioned
+        两种widget需要配合使用,Stack是给子widget提供绝对定位空间的容器,Positioned用来给子widget定位。
+        Stack属性：
+            1.this.alignment = AlignmentDirectional.topStart,//决定如何对齐没有定位(没有使用Positioned)或部分定位(只指定了一个定位属性)的子widget
+            2.this.textDirection,//和Row、Wrap的textDirection一样,用来决定alignment的参考系(从右到左还是从左到右)
+            3.this.fit = StackFit.loose,//决定没有定位的子widget如何适应Stack的大小,StackFit.loose表示使用子widget大小,StackFit.expand表示扩伸到Stack的大小
+            4.this.overflow = Overflow.clip,//决定如何显示超出Stack空间的子Widget,Overflow.clip时,超出部分会被隐藏,值为Overflow.visible则不会
+            5.List<Widget> children = const <Widget>[],
+
+
+三、容器类Widget

@@ -98,7 +98,103 @@ SpringBoot
 		同样,列表按优先级排序。就是说，在/config子目录里的application.properties会覆盖应用程序classpath里的application.properties中的相同属性。
 		此外，如果在同一优先级位置同时又application.properties和application.yml,那么.yml里的属性会覆盖.properties里的属性
 
+	3.应用程序Bean的配置外置
+		在类上标注@ConfigurationProperties("prefix")说明该Bean的属性是(通过setter方法)从配置属性值注入的。更具体一点,prefix说明这个Baen应该注入带prefix前缀的属性。
+		例，我们可以在application.properties里设置该属性:
+			amazon.associateId=fangyiming-95
+		或在application.yml里设置
+			amazon:
+				associateId: "fangyiming-95"
+		或将该属性设置为环境变量、命令行参数等任何能够设置配置属性的地方即可。
+
+		开启属性配置： 
+			@ConfigurationProperties注解不会生效,除非先向Spring配置类添加@EnableConfigurationProperties注解。但通常不需要这么做，因为SpringBoot自动配置后面的全部配置类都已经加上了这个注解。
+
+		关于SpringBoot的属性解析器:
+			SpringBoot的属性解析器很智能,它会自动把驼峰规则的属性和使用连字符或下划线的同名属性关联起来。也就是说amazon.associateId和amazon.associate-id和amazon.associte_id是等价的。
+
+	4.Profile
+		profile是一种条件化配置,基于运行时激活的profile,会使用或者忽略不同的bean或配置类。
+		使用@Profile("name")注解标注该bean或配置类是基于哪种profile运行的。
+
+		设置spring.profile.active属性就能激活profile,任意设置配置属性的方式都能用于设置这个值。
+
+		(1)使用特定于Profile的属性文件
+			如果你正在使用application.properties,可以创建额外的application-{profile}.properties文件,这样可以提供基于该profile的属性文件
 
 
+		(2)使用多Profile YAML文件配置
+			如果使用yaml来配置属性,也可以遵循与配置文件相同的命名规范,即创建application-{profile}.yml文件。
+			但既然使用了YAML，就可以把所有Profile的配置属性都放在一个application.yml文件中,例:
+			logging:
+				level:
+					root: INFO
+
+			---
+			spring:
+				profiles: development
+
+			logging:
+				level:
+					root: DEBUG
+
+			---
+			spring:
+				profiles: production
+
+			logging:
+				path: /tmp/
+				file: BookWorm.log
+				level:
+					root: WARN
+
+			这段配置用一组三个连字符(---)分隔为三个部分,第二部分和第三部分分别为spring.profiles指定了一个值,表示该部分配置应该应用在哪个profile里。另一方面，第一段并未指定spring.profiles,因此这里的属性对全部Profiles生效,或者对那些未设置该属性的激活Profile生效。
+
+	5.定制应用程序错误页面
+		SpringBoot自动配置的默认错误处理器会查找名为error的试图,如果找不到就用默认的白标错误试图。所以，最简单的方法就是创建一个自定义试图，让解析出的试图名为error
+			如果配置了Thymeleaf,则配置名为error.html的thymeleaf模板
+
+		把模板放在模板文件夹中,在SpringBoot中是resource/tepmlates/下
+
+
+四、Actuator
+	SpringBoot Actuator的特性是在应用程序里提供众多的Web端点(EndPoint),可以通过他们了解应用程序运行时的内部状况。有了Actuator,你可以知道Bean在Spring应用程序上下文里是如何装配到一起的,掌握程序运行时的环境属性信息,获取运行时度量信息快照...
+	SpringBoot 2.0.3中的Actuator提供了10多种端点:
+	HTTP方法		路径					描述
+	GET			/autoconfig 		提供了一份自动配置报告，记录哪些自动配置条件通过了，哪些没通过
+	GET			/configprops 		描述配置属性（包含默认值）如何注入Bean
+	GET			/beans 				描述应用程序上下文里全部的Bean，以及它们的关系
+	GET			/threaddump 				获取线程活动的快照
+	GET			/env 				获取全部环境属性
+	GET			/env/{name} 		根据名称获取特定的环境属性值
+	GET			/health 			报告应用程序的健康指标，这些值由 HealthIndicator 的实现类提供
+	GET			/info 				获取应用程序的定制信息，这些信息由 info 打头的属性提供
+	GET			/mappings 			描述全部的URI路径，以及它们和控制器（包含Actuator端点）的映射关系
+	GET			/metrics 			报告各种应用程序度量信息，比如内存用量和HTTP请求计数
+	GET			/metrics/{name} 	报告指定名称的应用程序度量值
+	POST		/shutdown			关闭应用程序，要求 endpoints.shutdown.enabled 设置为 true
+	GET			/httptrace 				提供基本的HTTP请求跟踪信息（时间戳、HTTP头等）
+	...
+
+	要启用Actuator的端点,只需在项目中因故Actuator的起步依赖即可:
+	<dependency>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-actuator</artifactId>
+	</dependency>	
+
+	默认情况下,Actuator的访问路径为schema://<projectpath>/actuator/<endpoint ID>,使用下面属性修改Actuator的访问路径:
+		management.endpoints.web.base-path=/{path}
+
+	还可以使用下面的属性将/actuator/health的访问路径改成/actuator/healthcheck
+		management.endpoints.web.path-mappint.health=healthcheck		
+	其中health可以是其他EndPoint ID
 
 	
+	默认情况下,使用Web访问Actuator时,Actuator对外只暴露info,health信息。通过修改属性可以改变默认行为：
+		management.endpoints.web.exposure.include=info,beans,health,sessions
+	当属性值为*时,暴露所有endpoint
+		management.endpoints.web.exposure.include=*
+
+
+
+
