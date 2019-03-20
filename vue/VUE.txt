@@ -172,4 +172,81 @@
 
     额外的，type还可以是一个自定义的构造函数。
 
-    12.非Prop的特性
+12.非Prop的特性
+    非prop特性是指传向一个组件，但是该组件没有相应的prop定义的特性。此时传入的非prop特性会添加到组件的根元素上
+    例：
+        Vue.component("my-input",{
+            template : `
+                <input/>
+            `,
+            mounted : function(){
+
+            }
+        });
+        然后使用：
+        <my-input a-attr="whatever"></my-input>
+
+        渲染出来的input标签
+        <input a-attr="whatever"></input>
+
+    *** 对于绝大多数特性来说，从外部提供给组件的值会替换掉组件内设置好的值。而class和style特性会稍微智能一点，两边的值会被合并起来。
+
+    禁用特性继承：
+        如果不希望组件的根元素继承特性，可以在组件选项中设置
+        Vue.component('my-component', {
+            inheritAttrs: false,
+            // ...
+        })
+        可以配合实例的$attrs属性使用，该属性包含了传递给一个组件的所有特性名和特性值。
+        有了inheritAttrs和$attrs，就可以手动决定这些特性会被赋予哪个元素，而不是默认的组件根元素。
+
+        例：Vue.component('base-input', {
+                inheritAttrs: false,
+                props: ['label', 'value'],
+                template: `
+                    <label>
+                        {{ label }}
+                        <input
+                            v-bind="$attrs"
+                         v-bind:value="value"
+                         v-on:input="$emit('input', $event.target.value)"
+                        >
+                 </label>
+                `
+            })
+        此时传递各base-input的特性会被赋予给input，而不是根元素label
+
+13.v-model的特殊情况
+    默认的，v-model="variable"相当于在组件上使用了v-bind:value="variable" v-on:input="variable = $event",且需要子组件调用$emit('input',newValue)抛出值。
+
+    但是，例如单选框和复选框等输入类型的控件的的值不是由value属性来控制的，是由checked属性控制的，此时model选项可以用来避免这样的冲突：
+    Vue.component('my-radio',{
+        model : {
+            prop : 'checked',
+            event : 'change'
+        },
+        props : {
+            checked : Boolean
+        },
+        template : `
+            <input type="checkbox" v-bind:checked="checked"  @change="$emit('change',$event.target.checked)"/>
+        `
+
+    });
+
+    其中
+        model : {
+            prop : 'checked',
+            event : 'change'
+        }
+        的含义，时当你使用v-model绑定一个属性时，相当与在组件上使用了v-bind:checked="variable"  v-on:change="variable = $event"
+
+    思考：不使用model,让v-model作用在my-radio组件上时实现双向绑定
+        Vue.component("my-radio",{
+            props : {
+                value : Boolean
+            },
+            template : `
+                <input type="checkbox" :checked="value" v-on:change="$emit('input',$event.target.checked)"/>
+            `
+        });
