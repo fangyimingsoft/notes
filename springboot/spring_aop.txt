@@ -1,0 +1,112 @@
+/**
+ * Spring AOP核心类继承关系
+ *  ProxyConfig     Advised
+ *         |          
+ *        AdvisedSupport
+ *              |
+ *      ProxyCreatorSupport
+ *             |
+ *          ProxyFactory
+ *
+ * Spring AOP创建JDK代理或CGLIB代理时使用的依据：
+ * 如果同时满足：
+ * 1.没有设置optimize为true(启用优化处理方式，默认为false)
+ * 2.没有设置proxyTargetClass为true(默认为false)
+ * 3.没有设置目标代理接口
+ * 则使用JDK的动态代理，否则使用CGLIB的动态代理
+ *
+ *
+ * 引介增强：
+ * 不是在目标方法周围织入增强，而是为目标类创建新的方法和属性，所以引介增强的连接点是类级别的。可以通过它为目标类添加一个接口的实现
+ *
+ * Spring使用了IntroductionInterceptor描述引介增强接口,接口没有定义任何方法。通常通过继承DelegatingIntroductionInterceptor,覆盖invoke方法定义自己的引介增强类
+ * 例:
+ * public class WaiterIntroductionInterceptor extends DelegatingIntroductionInterceptor implements Iterable{
+ *     @Override
+ *     public Object invoke(MethodInvocation mi) throws Throwable {
+ *         System.out.println("....");
+ *         Object obj = super.invoke(mi);
+ *         System.out.println("....");
+ *         return obj;
+ *     }
+ *
+ *     public Iterator iterator() {
+ *         return null;
+ *     }
+ * }
+ *
+ * public interface Waiter {
+ *     void sayHi();
+ *     void service();
+ * }
+ * driver:
+ * Waiter waiter = new Waiter() {
+ *             public void sayHi() {
+ *                 System.out.println("hi");
+ *             }
+ *             public void service() {
+ *                 System.out.println("do service");
+ *             }
+ *         };
+ * ProxyFactory pf = new ProxyFactory();
+ * pf.setInterfaces(Waiter.class);
+ * pf.setTarget(waiter);
+ * pf.addAdvice(new WaiterIntroductionInterceptor());
+ * Waiter proxy = (Waiter)pf.getProxy();//返回的proxy实现了Iterable接口
+ * System.out.println(proxy instanceof Iterable);//true
+ *
+ *
+ */
+一、Spring AOP增强类型
+        Spring AOP的接口都是从AOP联盟定义的接口Advice继承而来
+        AOP联盟定义的接口：
+            Advice
+            Interceptor
+            MethodInterceptor
+            IntroductionInterceptor
+
+    1.前置增强(BeforeAdvice.Spring只支持方法级的增强,所以MethodBeforeAdvice是目前可用的前置增强)
+        在方法调用前实施增强
+
+    2.后置增强(AfterReturningAdvice)
+        在方法返回后实施增强
+
+    3.环绕增强(MethodInterceptor)
+        在目标方法执行前后实施增强
+
+    4.异常抛出增强(ThrowsAdvice)
+        在目标方法抛出异常后实施增强
+
+    5.引介增强(IntroductionInterceptor)
+        表示在目标类中添加一些新的方法和属性
+
+二、切面
+    Spring提供的[切点]类型：
+    1.静态方法切点
+        StaticMethodMatcherPointcut是静态方法切点的抽象基类，默认匹配所有类。它有两个子类，分别是NameMatchMethodPointcut(简单的字符串匹配方法签名)、AbstractRegexpMethodPointcut(正则表达式匹配方法签名)。
+
+    2.动态方法切点
+        DynamicMethodMatcherPointcut是动态方法切点的抽象基类,默认匹配所有类。
+
+    3.注解切点
+        AnnotationMatchingPointcut实现类表示注解切点。使用AnnotationMatchingPointcut支持在Bean中直接通过注解标签定义切点。
+
+    4.表达式切点
+        ExpressionPointcut接口,主要为了支持AspectJ切点表达式语法定义的接口
+
+    5.流程切点
+        ControlFlowPointcut实现类表示控制流程切点。它是一种特殊的切点，根据程序执行的对战信息查看目标方法是否由一个方法直接或间接发起调用，以此判断是否匹配的连接点。
+
+    6.复合切点
+        ComposablePointcut实现类是为创建多个切点提供方便操作的类。他的所有方法都返回ComposablePointcut类以便对切点使用链式操作。
+
+    Spring提供的[切面]类型：
+       1.Advisor
+
+       2.PointcutAdvisor
+
+       3.IntroductionAdvisor
+
+
+
+
